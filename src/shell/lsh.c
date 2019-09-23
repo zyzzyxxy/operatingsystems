@@ -22,6 +22,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "parse.h"
+#define SIGINT  2   /* Interrupt the process */ 
 
 /*
  * Function declarations
@@ -39,10 +40,16 @@ int done = 0;
  * Description: Gets the ball rolling...
  *
  */
+void handle_sigint(int sig) 
+{ 
+    printf("Caught signal %d\n", sig); 
+}
 int main(void)
 {
-  Command cmd;
+  Command cmd;	
   int n;
+  pid_t pid;
+  signal(SIGINT, handle_sigint); 
 
   while (!done) {
 
@@ -52,7 +59,10 @@ int main(void)
     if (!line) {
       /* Encountered EOF at top level */
       done = 1;
-    }
+    }//Exits the program on command;
+    else if(compareStrings(line,"exit")){
+	    done=1;	
+	}
     else {
       /*
        * Remove leading and trailing whitespace from the line
@@ -68,13 +78,24 @@ int main(void)
         PrintCommand(n, &cmd);
 	printf(line);
 	printf("\n");
-	printf("&cmd: %d\n",&cmd);
-	printf("&cmd: %d\n",cmd);
-	printf("line==qwe: %d\n",strcmp(line, "qwe"));
-	printf("line==qwe: %d\n",compareStrings(line, "qwe"));
-	if(strcmp(line, "qwe")==0)
-		printf("qwe was typed \n");	
-     	executeCommand(line); 
+	pid = fork();
+	if(pid==0){
+	    //child process
+	    printf("child executing... \n");     	
+	    //executeCommand(line); 
+	    executeCmd2(&cmd);
+	    printf("child done\n");
+	    }
+	else{
+		Command *cmdPointer = &cmd;
+		int bg = cmdPointer->bakground;
+		if(!bg){
+		    wait(0);
+		    printf("parent waiting..\n");
+		}
+		printf("Parent done, pid: %d\n",pid);
+	    }
+	printf("Done: %d\n",done);
 	}
     }
     
@@ -95,6 +116,11 @@ if(strcmp(s1,s2)==0)
 	return 1;
 return 0;
 }
+int executeCmd2(Command *cmd){
+    	Pgm *p = cmd->pgm;
+	execvp(p->pgmlist[0], p->pgmlist);
+}
+/*
 int executeCommand(char *s)
 {
     int validCommand=0;
@@ -116,8 +142,8 @@ int executeCommand(char *s)
     	validCommand = 1;
     }
     else if(compareStrings("exit",s)){
-    	args[0] = "/bin/ls";        // first arg is the full path to the executable
-    	validCommand = 1;
+    done = 1;
+    exit(0);
     }
     if(validCommand){
     	if ( fork() == 0 )
@@ -127,6 +153,7 @@ int executeCommand(char *s)
     }
     return 0;
 }
+*/
 /*
  * Name: PrintCommand
  *
