@@ -23,6 +23,14 @@
 #include <readline/history.h>
 #include "parse.h"
 
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <signal.h>
+
 /*
  * Function declarations
  */
@@ -66,12 +74,12 @@ int main(void)
         /* execute it */
         n = parse(line, &cmd);
         PrintCommand(n, &cmd);
-	printf(line);
-	printf("\n");
-	printf("&cmd: %d\n",&cmd);
-	printf("&cmd: %d\n",cmd);
-	printf("line==qwe: %d\n",strcmp(line, "qwe"));
-	printf("line==qwe: %d\n",compareStrings(line, "qwe"));
+	//printf(line);
+	//printf("\n");
+	//printf("&cmd: %d\n",&cmd);
+	//printf("&cmd: %d\n",cmd);
+	printf(" %d",strcmp(line, "qwe"));
+	printf(compareStrings(line, "qwe"));
 	if(strcmp(line, "qwe")==0)
 		printf("qwe was typed \n");	
      	executeCommand(line); 
@@ -96,7 +104,12 @@ if(strcmp(s1,s2)==0)
 return 0;
 }
 int executeCommand(char *s)
-{
+{  Command *cmd;
+  int bkg = cmd -> background
+  int ifd = STDIN_FILENO;
+  int ofd = STDOUT_FILENO;
+  pid_t pid;
+
     int validCommand=0;
     int status;
     char *args[2];
@@ -119,11 +132,20 @@ int executeCommand(char *s)
     	args[0] = "/bin/ls";        // first arg is the full path to the executable
     	validCommand = 1;
     }
-    if(validCommand){
-    	if ( fork() == 0 )
+  if(validCommand){
+      if ( fork() == 0 ){
              execv( args[0], args ); // child: call execv with the path and the args
-    	else
-             wait( &status );        // parent: wait for the child (not really necessary)
+            if(bkg){ signal(SIGINT, SIG_IGN);
+                    dup2(ifd, STDIN_FILENO);
+                    execArgsPiped(p, ofd);
+                    exit(EXIT_SUCCESS);
+
+            }
+          }
+    	else{
+         if (!bg) waitpid(pid, NULL, 0);
+      }
+            
     }
     return 0;
 }
@@ -194,4 +216,46 @@ stripwhite (char *string)
   }
 
   string [++i] = '\0';
+}
+
+void pipeMethod(int *piped){
+  if(pipe(piped) == -1){
+    perror(NULL);
+  }
+  return;
+}
+
+void execArgsPiped(Pgm *p, int parsed){
+char ** str = p->pgmlist;
+int piped[2];
+pid_t pid;
+
+if((p->next) == NULL){
+  dup2(parsed, STDOUT_FILENO);
+    if (execvp(*str, str) ==-1){
+      perror(NULL);
+      exit(EXIT_FAILURE);
+    }
+  }
+    else{
+        pipeMethod(piped);
+        pid = fork();
+        if(pid == 0){//child process
+          close(piped[0]);
+          execArgsPiped(p->next, piped[1]);
+          exit(EXIT_SUCCESS)
+        }
+         else{//parent process
+          close(piped[1]);
+          waitpid(pid, NULL, 0);
+          dup2(parsed, STDOUT_FILENO);
+          dup2(piped[0], STDOUT_FILENO);
+              if(execvp(*str, str) == -1){
+                  perror(NULL);
+                  exit(EXIT_FAILURE);
+              }
+        }
+
+    }
+
 }
