@@ -16,7 +16,7 @@
  * All the best 
  */
 
-
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <readline/readline.h>
@@ -46,7 +46,7 @@ void handle_sigint(int sig)
 }
 int main(void)
 {
-  Command cmd;	
+  Command cmd;
   int n;
   pid_t pid;
   signal(SIGINT, handle_sigint); 
@@ -76,6 +76,20 @@ int main(void)
         /* execute it */
         n = parse(line, &cmd);
         PrintCommand(n, &cmd);
+	//checking for special case cd
+	if(checkForCD(&cmd)){
+	    Command *c = &cmd;
+	    Pgm *p = c->pgm;	
+		char s[100];
+	    printf("CD command typed %s\n", p->pgmlist[0]);
+	    printf("CD command typed %s\n", p->pgmlist[1]);
+	    printf("path before: %s\n", getcwd(s, 100)); 
+  	    
+	    if (chdir(p->pgmlist[1]) != 0)  
+    		perror("chdir() failed, maby your directory doesn´t exist?\n"); 
+	    printf("path after: %s\n", getcwd(s,100));
+	}	
+        else{
 	printf(line);
 	printf("\n");
 	pid = fork();
@@ -89,14 +103,16 @@ int main(void)
 	else{
 		Command *cmdPointer = &cmd;
 		int bg = cmdPointer->bakground;
+		//Make process run in background or wait
 		if(!bg){
 		    wait(0);
 		    printf("parent waiting..\n");
 		}
 		printf("Parent done, pid: %d\n",pid);
 	    }
-	printf("Done: %d\n",done);
 	}
+	printf("Done: %d\n",done);
+ 	}
     }
     
     if(line) {
@@ -104,6 +120,12 @@ int main(void)
     }
   }
   return 0;
+}
+int checkForCD(Command *cmd){
+	Pgm *p = cmd->pgm;
+	if(compareStrings(p->pgmlist[0],"cd"))
+	    return 1;
+	return 0;
 }
 /*
  *returns 1 if strings identical else -1
@@ -120,40 +142,6 @@ int executeCmd2(Command *cmd){
     	Pgm *p = cmd->pgm;
 	execvp(p->pgmlist[0], p->pgmlist);
 }
-/*
-int executeCommand(char *s)
-{
-    int validCommand=0;
-    int status;
-    char *args[2];
-    printf("%s",s);
-    args[1] = NULL;             // list of args must be NULL terminated
-
-    if(compareStrings("ls", s)){
-    	args[0] = "/bin/ls";        // first arg is the full path to the executable
-    	validCommand = 1;
-    }
-    else if(compareStrings("date",s)){
-    	args[0] = "/bin/date";        // first arg is the full path to the executable
-    	validCommand = 1;
-    }
-    else if(compareStrings("who",s)){
-    	args[0] = "/bin/who";        // first arg is the full path to the executable
-    	validCommand = 1;
-    }
-    else if(compareStrings("exit",s)){
-    done = 1;
-    exit(0);
-    }
-    if(validCommand){
-    	if ( fork() == 0 )
-             execv( args[0], args ); // child: call execv with the path and the args
-    	else
-             wait( &status );        // parent: wait for the child (not really necessary)
-    }
-    return 0;
-}
-*/
 /*
  * Name: PrintCommand
  *
