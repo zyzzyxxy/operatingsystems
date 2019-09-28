@@ -81,37 +81,25 @@ int main(void)
 	    Command *c = &cmd;
 	    Pgm *p = c->pgm;	
 		char s[100];
-	    printf("CD command typed %s\n", p->pgmlist[0]);
-	    printf("CD command typed %s\n", p->pgmlist[1]);
-	    printf("path before: %s\n", getcwd(s, 100)); 
   	    
 	    if (chdir(p->pgmlist[1]) != 0)  
-    		perror("chdir() failed, maby your directory doesn´t exist?\n"); 
-	    printf("path after: %s\n", getcwd(s,100));
+    	    	perror("chdir() failed, maby your directory doesn´t exist?\n"); 
 	}	
         else{
-	printf(line);
-	printf("\n");
 	pid = fork();
 	if(pid==0){
 	    //child process
-	    printf("child executing... \n");     	
-	    //executeCommand(line); 
 	    executeCmd2(&cmd);
-	    printf("child done\n");
+	    exit(0);
 	    }
-	else{
-		Command *cmdPointer = &cmd;
-		int bg = cmdPointer->bakground;
+	else{//parent process
+            Command *cmdPointer = &cmd;
+	    int bg = cmdPointer->bakground;
 		//Make process run in background or wait
-		if(!bg){
-		    wait(0);
-		    printf("parent waiting..\n");
-		}
-		printf("Parent done, pid: %d\n",pid);
+	    if(!bg)
+		wait(0);
 	    }
 	}
-	printf("Done: %d\n",done);
  	}
     }
     
@@ -138,9 +126,17 @@ if(strcmp(s1,s2)==0)
 	return 1;
 return 0;
 }
+
+/*----HERE THE MAGIC HAPPENS-----*/
 int executeCmd2(Command *cmd){
-    	Pgm *p = cmd->pgm;
-	execvp(p->pgmlist[0], p->pgmlist);
+    if (cmd->rstdin)
+	freopen(cmd->rstdin, "r", stdin);
+    if (cmd->rstdout)
+	freopen(cmd->rstdout, "w", stdout);
+	
+    Pgm *p = cmd->pgm;
+    execvp(p->pgmlist[0], p->pgmlist);
+
 }
 /*
  * Name: PrintCommand
