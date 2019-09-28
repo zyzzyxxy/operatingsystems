@@ -16,7 +16,6 @@
  * All the best 
  */
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <readline/readline.h>
@@ -25,21 +24,27 @@
 
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <unistd.h>
-#include <string.h>
+#include <unistd.h> 
+#include <string.h> 
 #include <sys/stat.h>
-#include <fcntl.h>
-#include <signal.h>
+#include <fcntl.h> 
+#include <signal.h> 
+#define SIGINT  2   /* Interrupt the process */ 
 
 /*
  * Function declarations
- */
+ */ 
 
 void PrintCommand(int, Command *);
 void PrintPgm(Pgm *);
 void stripwhite(char *);
+void execArgsPiped(Pgm *p, int parsed);
+void handle_sigint(int);
+void handle_sigchld(int);
+
 /* When non-zero, this global means the user is done using this program. */
 int done = 0;
+char array[4096];
 
 /*
  * Name: main
@@ -47,10 +52,26 @@ int done = 0;
  * Description: Gets the ball rolling...
  *
  */
+void handle_sigint(int sig)
+{
+if (sig = SIGINT) {
+    printf("Caught signal %d\n", sig);
+}
+}
+void handle_sigchld(int sig){
+  if (sig == SIGCHLD) {
+    waitpid(-1, NULL, WNOHANG);
+  }
+}
 int main(void)
 {
   Command cmd;
   int n;
+  pid_t pid;
+
+  getcwd(array, sizeof(array));
+  signal(SIGINT, handle_sigint);
+  signal(SIGCHLD, handle_sigchld);
 
   while (!done) {
 
@@ -60,7 +81,8 @@ int main(void)
     if (!line) {
       /* Encountered EOF at top level */
       done = 1;
-    }
+
+        }
     else {
       /*
        * Remove leading and trailing whitespace from the line
@@ -72,25 +94,18 @@ int main(void)
       if(*line) {
         add_history(line);
         /* execute it */
-        n = parse(line, &cmd);
-        PrintCommand(n, &cmd);
-	//printf(line);
-	//printf("\n");
-	//printf("&cmd: %d\n",&cmd);
-	//printf("&cmd: %d\n",cmd);
-	printf(" %d",strcmp(line, "qwe"));
-	printf(compareStrings(line, "qwe"));
-	if(strcmp(line, "qwe")==0)
-		printf("qwe was typed \n");	
-     	executeCommand(line); 
-	}
+        parse(line, &cmd);
+        executeCmd2(&cmd);
+        //PrintCommand(n, &cmd);
+        //checking for special case cd
+         }
     }
-    
+
     if(line) {
       free(line);
-    }
-  }
-  return 0;
+        }
+}
+        return 0;
 }
 /*
  *returns 1 if strings identical else -1
@@ -100,54 +115,51 @@ int
 compareStrings (char *s1, char *s2)
 {
 if(strcmp(s1,s2)==0)
-	return 1;
+        return 1;
 return 0;
 }
-int executeCommand(char *s)
-{  Command *cmd;
-  int bkg = cmd -> background
-  int ifd = STDIN_FILENO;
-  int ofd = STDOUT_FILENO;
-  pid_t pid;
 
-    int validCommand=0;
-    int status;
-    char *args[2];
-    printf("%s",s);
-    args[1] = NULL;             // list of args must be NULL terminated
+/*----HERE THE MAGIC HAPPENS-----*/
+int executeCmd2(Command *cmd){
+pid_t pid;
+Pgm *p = cmd -> pgm;
+char **pl = p->pgmlist;
+int bkg = cmd -> bakground;
+int input = STDIN_FILENO;
+int output = STDOUT_FILENO;
 
-    if(compareStrings("ls", s)){
-    	args[0] = "/bin/ls";        // first arg is the full path to the executable
-    	validCommand = 1;
-    }
-    else if(compareStrings("date",s)){
-    	args[0] = "/bin/date";        // first arg is the full path to the executable
-    	validCommand = 1;
-    }
-    else if(compareStrings("who",s)){
-    	args[0] = "/bin/who";        // first arg is the full path to the executable
-    	validCommand = 1;
-    }
-    else if(compareStrings("exit",s)){
-    	args[0] = "/bin/ls";        // first arg is the full path to the executable
-    	validCommand = 1;
-    }
-  if(validCommand){
-      if ( fork() == 0 ){
-             execv( args[0], args ); // child: call execv with the path and the args
-            if(bkg){ signal(SIGINT, SIG_IGN);
-                    dup2(ifd, STDIN_FILENO);
-                    execArgsPiped(p, ofd);
-                    exit(EXIT_SUCCESS);
+if(strcmp("exit", *pl) == 0){
+        exit(EXIT_SUCCESS);
+}
+else if(("cd", *pl) == 0){
+        pl++;
 
-            }
-          }
-    	else{
-         if (!bg) waitpid(pid, NULL, 0);
-      }
-            
-    }
-    return 0;
+        if(chdir(*pl) == -1)
+                perror(NULL);
+        getcwd(array, sizeof(array));
+}
+else{
+       if (cmd ->rstdout){
+         output = creat(cmd ->rstdout, 0200 | 0400);
+        }
+        if (cmd ->rstdin){
+        input = open(cmd ->rstdin, O_RDONLY);
+        }
+        pid = fork();
+        if(pid == -1){
+                perror(NULL);
+        }
+        if(pid == 0){
+                if(bkg) signal(SIGINT, SIG_IGN);
+                dup2(input, STDIN_FILENO);
+                execArgsPiped(p, output);
+                exit(EXIT_SUCCESS);
+        }
+        else{
+                if(!bkg) waitpid(pid, NULL, 0);
+        }
+   // execvp(p->pgmlist[0], p->pgmlist);
+        }
 }
 /*
  * Name: PrintCommand
@@ -205,7 +217,7 @@ stripwhite (char *string)
   while (isspace( string[i] )) {
     i++;
   }
-  
+
   if (i) {
     strcpy (string, string + i);
   }
@@ -217,6 +229,7 @@ stripwhite (char *string)
 
   string [++i] = '\0';
 }
+
 
 void pipeMethod(int *piped){
   if(pipe(piped) == -1){
@@ -239,17 +252,21 @@ if((p->next) == NULL){
   }
     else{
         pipeMethod(piped);
-        pid = fork();
+  pid = fork();
+
+         if (-1 == pid){
+          perror(NULL);
+         }
         if(pid == 0){//child process
           close(piped[0]);
           execArgsPiped(p->next, piped[1]);
-          exit(EXIT_SUCCESS)
+          exit(EXIT_SUCCESS);
         }
          else{//parent process
           close(piped[1]);
           waitpid(pid, NULL, 0);
           dup2(parsed, STDOUT_FILENO);
-          dup2(piped[0], STDOUT_FILENO);
+          dup2(piped[0], STDIN_FILENO);
               if(execvp(*str, str) == -1){
                   perror(NULL);
                   exit(EXIT_FAILURE);
@@ -257,5 +274,7 @@ if((p->next) == NULL){
         }
 
     }
-
 }
+
+
+                                              
