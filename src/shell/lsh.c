@@ -23,7 +23,8 @@
 #include <readline/history.h>
 #include "parse.h"
 #define SIGINT  2   /* Interrupt the process */ 
-
+#define READ_PIPE 0
+#define WRITE_PIPE 1
 /*
  * Function declarations
  */
@@ -84,20 +85,21 @@ int main(void)
   	    
 	    if (chdir(p->pgmlist[1]) != 0)  
     	    	perror("chdir() failed, maby your directory doesn´t exist?\n"); 
-	}	
+			}	
         else{
-	pid = fork();
-	if(pid==0){
-	    //child process
-	    executeCmd2(&cmd);
-	    exit(0);
+	
+		pid = fork();
+		if(pid==0){
+	    	//child process
+	    	executeCmd2(&cmd);
+	    	exit(0);
 	    }
-	else{//parent process
+		else{//parent process
             Command *cmdPointer = &cmd;
-	    int bg = cmdPointer->bakground;
-		//Make process run in background or wait
-	    if(!bg)
-		wait(0);
+	    	int bg = cmdPointer->bakground;
+			//Make process run in background or wait
+	    	if(!bg)
+				wait(0);
 	    }
 	}
  	}
@@ -129,14 +131,61 @@ return 0;
 
 /*----HERE THE MAGIC HAPPENS-----*/
 int executeCmd2(Command *cmd){
-    if (cmd->rstdin)
-	freopen(cmd->rstdin, "r", stdin);
-    if (cmd->rstdout)
-	freopen(cmd->rstdout, "w", stdout);
-	
-    Pgm *p = cmd->pgm;
-    execvp(p->pgmlist[0], p->pgmlist);
+ 
+	int cmd_counter = 1;
+	int fd[2];
 
+    Pgm *p = cmd->pgm;
+	while(p->next){
+		cmd_counter ++;
+		p=p->next;
+	}
+	printf("command counter: %d\n", cmd_counter);
+	if(cmd_counter == 1){
+   		if (cmd->rstdin)
+			freopen(cmd->rstdin, "r", stdin);
+    	if (cmd->rstdout)
+			freopen(cmd->rstdout, "w", stdout);
+	
+    	execvp(p->pgmlist[0], p->pgmlist);
+	}else{
+        printf("In else \n");
+		int i = 0;
+		int MSGSIZE = 100;
+		char inbuf[MSGSIZE]; 
+		//pipe(fd_parent_to_child);
+		pipe(fd);
+		p = cmd->pgm;
+		printf("before while\n");
+		while(i<cmd_counter){
+			printf("In while\n");
+			pid_t pid = fork();
+			printf("pid: %d\n", pid);	
+			if(pid<0){ printf("fork failed");}
+			if(pid==0){//child process
+				printf("Child executing pipe");
+    			close(fd[0]);
+    			dup2(fd[1], STDOUT_FILENO);
+				close(fd[1]);
+				execvp(p->pgmlist[0], p->pgmlist);
+				exit(0);
+			}
+			else{//Parent process
+				printf("In parent\n");
+				wait(0);
+				dup2(fd[0],STDIN_FILENO);
+				//close(fd_child_to_parent[0]);
+				read(fd[0], inbuf, MSGSIZE); 
+				printf(inbuf);
+			}
+		p=p->next;
+		i++;
+		}
+		
+   		close(fd[0]);
+    	close(fd[1]);
+		execvp(p->pgmlist[0], p->pgmlist);
+	}
 }
 /*
  * Name: PrintCommand
