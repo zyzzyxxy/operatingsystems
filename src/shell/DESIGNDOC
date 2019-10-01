@@ -7,9 +7,9 @@
 ---- GROUP ----
 
 >> Fill in the names and email addresses of your group members.
+Johan Ericsson <joherics@student.chalmers.se>
+Colin Owusu Adomako <collins@student.chalmers.se>
 
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
 
 ---- PRELIMINARIES ----
 
@@ -19,6 +19,8 @@ FirstName LastName <email@domain.example>
 >> Please cite any offline or online sources you consulted while
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course instructors.
+
+We have used https://stackoverflow.com/, https://www.geeksforgeeks.org/ for reading up on piping, forking.
 
 			   COMMAND SHELL
 			   =============
@@ -32,9 +34,13 @@ which parts.
 >> L1: How many hours did each team member spend on this assignment?
    Make sure that each member's total time is listed.
 
+   Johan Ericsson Approximetaly 20 hours
+   Colin Owusu Adomako Approximately 15 hours
+
 >> L2: What did each team member focus on for this assignment?  Keep
    descriptions to 25-30 words or less.
-
+   Johan Ericsson cd and exit commands and redirection
+   Colin Owusu Adomako overall quality and piping
 
 			  SURVEY QUESTIONS
 			  ================
