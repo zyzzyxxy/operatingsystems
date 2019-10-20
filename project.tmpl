@@ -1,0 +1,176 @@
+			+--------------------+
+			|    EDA092/DIT400   |
+			| LAB ASSIGNMENT 2:  |
+			| 	THREADS      |
+			|   DESIGN DOCUMENT  |
+			+--------------------+
+				   
+---- GROUP 19 ----
+
+>> Fill in the group number, names and email addresses of your group members.
+
+Johan Ericsson <joherics@student.chalmers.se>
+FirstName LastName <email@domain.example>
+FirstName LastName <email@domain.example>
+
+---- PRELIMINARIES ----
+Stack-overflow
+geeksforgeeks
+
+			     ALARM CLOCK
+			     ===========
+
+---- DATA STRUCTURES ----
+struct thread
+  {
+    /* Owned by thread.c. */
+    tid_t tid;                          /* Thread identifier. */
+    enum thread_status status;          /* Thread state. */
+    char name[16];                      /* Name (for debugging purposes). */
+    uint8_t *stack;                     /* Saved stack pointer. */
+    int priority;                       /* Priority. */
+    struct list_elem allelem;           /* List element for all threads list. */
+    int blocked_by_user;                /* to only work with this in our own methods */
+    int64_t blocked_for_ticks;          /* for calculating blocked in sleep */
+
+
+    /* Shared between thread.c and synch.c. */
+    struct list_elem elem;              /* List element. */
+
+#ifdef USERPROG
+    /* Owned by userprog/process.c. */
+    uint32_t *pagedir;                  /* Page directory. */
+#endif
+
+    /* Owned by thread.c. */
+    unsigned magic;                     /* Detects stack overflow. */
+
+};
+
+
+
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe what happens in a call to timer_sleep(),
+>> including the effects of the timer interrupt handler.
+
+Sets the thread to sleep for x ticks.
+To get rid of busy waiting, we init a value in the thread (blocked_for_ticks) and block the thread for the time being, then when a timer interupt happens threads decrement this value and unblock if it´s zero.
+We have also a variable "blocked bu user". The idea was to use this to not unblock blocked threads that was blocked by OS itself, but it wasn´t needed.
+
+>> A3: What steps are taken to minimize the amount of time spent in
+>> the timer interrupt handler?
+
+keeping simple as possible code, this is function call:
+
+  if(t->status == THREAD_BLOCKED){
+        t->blocked_for_ticks--;
+        if(t->blocked_for_ticks == 0){
+             thread_unblock(t);
+	}
+   }
+
+
+---- SYNCHRONIZATION ----
+
+>> A4: How are race conditions avoided when multiple threads call
+>> timer_sleep() simultaneously?
+
+Since nothing locks the timer and all threads have their value for blocking time in themself
+this will never be  a problem. Each thread checks itself each tick.
+
+>> A5: How are race conditions avoided when a timer interrupt occurs
+>> during a call to timer_sleep()?
+
+Same as above, since the only thing we do is making a thread dec its own waitcounter each tick no race conditions appear. 
+The worst thing that could happen is that an interuppt happens during the sleep function, causing an error of one tick in the wait time.
+
+---- RATIONALE ----
+
+>> A6: Why did you choose this design?  In what ways is it superior to
+>> another design you considered?
+
+This was the first idea that came to mind and it worked.
+Things like the "blocked by user wasn´t needed", the interupt function we placed in threads, seemed right to have it there.
+Locking variable could maby be placed somewhere else than in thread struct, but it felt right to have threads checking their own timer, makeing timer.c easier.
+
+			    BATCH SCHEDULING
+			    ================
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, semaphore, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+
+struct semaphore task_send_prio; 		//to se how many prio send in que
+struct semaphore task_receive_prio;		//to se how many prio receive in que
+struct semaphore task_send_low;			//Same as above, none prio
+struct semaphore task_receive_low;		//Same as above, none prio
+struct semaphore packets_in_bus;		//To see how many packets in bus (not needed only 											//for debugging)
+
+struct lock blocked;					//used to lock threads that cannot go on bus
+int currentDir;							//direction of traffic on bus
+int bussSlotsFree;						//how many slots are free on the bus
+struct condition global_cond;			//the condition variable used to lock threads 												//without permitions. Tasks broadcast on exit, 												//making waiting tasks recheck their permissions 
+
+---- SYNCHRONIZATION ----
+
+>> C1: How does your solution guarantee that no more that 3 tasks
+>> are using the bus in the same direction?
+
+if(
+	((bussSlotsFree>0 && task.direction == currentDir))  ||bussSlotsFree ==3 ||
+    ((task_send_prio.value==0 && task_receive_prio.value==0) && ((task.direction == currentDir && bussSlotsFree>0)||bussSlotsFree ==3))
+   )
+bussSlotsFree must be over 0
+
+
+>> C2: What prevents tasks from opposite directions from using the
+>> bus simultaneously?
+
+The conditions above. Tasks gets blocked if currentDirection != task direction. But they can go if bus is free
+
+>> C3: How does your solution grant priority to high priority tasks over
+>> the waiting tasks in the same direction?
+Low prio can only go on if (task_send_prio.value==0 && task_receive_prio.value==0)
+
+>> C4: How do you guarantee that despite having priority, high priority
+>> tasks do not start using the bus while there are still still using
+>> it in the oposite direction?
+
+condition for HP:
+(bussSlotsFree>0 && task.direction == currentDir))  ||bussSlotsFree ==3 
+
+---- RATIONALE ----
+
+>> C6: Why did you choose this design? Did you consider other design 
+>> alternatives? In what ways is it superior to another design you considered?
+We tried maby 10 designs of this, with without conditions and alot of if/else and semaphores.
+Nothing seemed to work til we putted all comparisons in one if statement for some reason.
+This did also get cleaner.
+
+			   SURVEY QUESTIONS (optional)
+			   ===========================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters?
+
+>> Any other comments?
