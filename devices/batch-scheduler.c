@@ -174,9 +174,9 @@ void getSlot(task_t task)
 	//Task can get on bus if bus is free or if same direction and no higher prio waiting
 	while(1){ 
 		if(
-		   (((bussSlotsFree>0 && task.direction == currentDir))  ||bussSlotsFree ==3 ||
-		   ((task_send_prio.value==0 && task_receive_prio.value==0) && (task.direction == currentDir && bussSlotsFree>0))	
-		){
+                   ((bussSlotsFree>0 && task.direction == currentDir))  ||bussSlotsFree ==3 ||
+                   ((task_send_prio.value==0 && task_receive_prio.value==0) && ((task.direction == currentDir && bussSlotsFree>0)||bussSlotsFree ==3))
+                ){
 			break;
 		}
 		cond_wait(&global_cond, &blocked);
